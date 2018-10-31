@@ -3,7 +3,8 @@
 
 import sys
 import json
-import python-iptables
+import iptc
+import socket
 
 def implementIPTables(file):
     #obtain desired MUD-like object to parse.
@@ -44,28 +45,31 @@ def ACLtoIPTable(acl):
         action = match["actions"]
         endpoint = match["ipv4"]
         protocol = match["tcp"]
+	dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
 
+	#resolve dest address
+	dest_addr = socket.gethostbyname(dest_name)
+	
+
+	chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "OUTPUT")
 
         #for test, just need one
         rule = iptc.Rule()
         rule.in_interface = "eth+"
-        #rule.src = protocol.text
+        rule.src = "192.168.1.120"
         rule.protocol = "tcp"
 
-        rule.dest = endpoint["ietf-acldns:src-dnsname"].text
-        rule.target = iptc.Target(rule, action["forwarding"].text)
-        rule.src = #local ip
-        match = rule.create_match("tcp")
-        match.dport = protocol["port"].text
+        rule.dst = dest_addr
+        rule.target = iptc.Target(rule, action["forwarding"].upper())
+       
+        match = iptc.Match(rule, "tcp")
+        match.dport = str(protocol["source-port"]["port"])
         rule.add_match(match)
+	chain.insert_rule(rule)
 
+    	print("IPTables Rules implemented for %s" % rule.src)
 
-
-
-
-        break
-
-    print(action, endpoint,protocol)
+    #print(action, endpoint,protocol)
 
 
 
