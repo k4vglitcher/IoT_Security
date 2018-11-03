@@ -5,6 +5,7 @@ import sys
 import json
 import iptc
 import socket
+import os
 
 def implementIPTables(file):
     #obtain desired MUD-like object to parse.
@@ -14,6 +15,10 @@ def implementIPTables(file):
     except FileNotFoundError:
         print("File does not exist")
         sys.exit()
+
+    #obtain device ip addr
+    head, tail = os.path.split(file)
+    filename = head.split('/')[-1]
 
     #verify and obtain if file content is JSON format
     try:
@@ -27,11 +32,10 @@ def implementIPTables(file):
     ACL_array = json_object["ietf-access-control-list:access-lists"]["acl"]
 
 
-    ACLtoIPTable(ACL_array)
-
+    ACLtoIPTable(ACL_array, filename)
 
 #parse device acl to iptable
-def ACLtoIPTable(acl):
+def ACLtoIPTable(acl, filename):
     match, action, endpoint, protocol = '','','',''
 
     #First set of ACES
@@ -39,12 +43,16 @@ def ACLtoIPTable(acl):
 
     #implement IPTables for each matches with their respective demands
     for index in ace:
-        match = index["matches"]
+        matches = index["matches"]
+		
+	#Confirm that matches is has valid info for dest addr
+	if("ietf-acldns:src-dnsname" not in matches["ipv4"]):
+	    continue
 
-#        #TCP FOR NOW FOR TEST
-        action = match["actions"]
-        endpoint = match["ipv4"]
-        protocol = match["tcp"]
+
+        #TCP FOR NOW FOR TEST
+        action = matches["actions"]
+        endpoint = matches["ipv4"]
 	dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
 
 	#resolve dest address
@@ -56,13 +64,26 @@ def ACLtoIPTable(acl):
         #for test, just need one
         rule = iptc.Rule()
         rule.in_interface = "eth+"
-        rule.src = "192.168.1.120"
-        rule.protocol = "tcp"
+        rule.src = filename
 
         rule.dst = dest_addr
         rule.target = iptc.Target(rule, action["forwarding"].upper())
-       
-        match = iptc.Match(rule, "tcp")
+      
+        if("tcp" in matches):
+            protocol = matches["tcp"]
+            rule.protocol = "tcp"
+	    match = iptc.Match(rule, "tcp")
+
+        elif("udp" in matches): 
+	    protocol = matches["udp"]
+            rule.protocol = "udp"
+	    match = iptc.Match(rule, "udp")
+
+        else: 
+            print("Error in matches")
+            pass
+        
+
         match.dport = str(protocol["source-port"]["port"])
         rule.add_match(match)
 	chain.insert_rule(rule)
