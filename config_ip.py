@@ -45,12 +45,12 @@ def ACLtoIPTable(acl, filename):
     for index in ace:
         matches = index["matches"]
 		
-	#Confirm that matches is has valid info for dest addr
+	#Confirm that matches has valid info for dest addr
 	if("ietf-acldns:src-dnsname" not in matches["ipv4"]):
 	    continue
 
 
-        #TCP FOR NOW FOR TEST
+        #capture essential info
         action = matches["actions"]
         endpoint = matches["ipv4"]
 	dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
@@ -63,7 +63,7 @@ def ACLtoIPTable(acl, filename):
 
         #for test, just need one
         rule = iptc.Rule()
-        rule.in_interface = "eth+"
+        rule.out_interface = "eth+"
         rule.src = filename
 
         rule.dst = dest_addr
@@ -90,9 +90,13 @@ def ACLtoIPTable(acl, filename):
 
     	print("IPTables Rules implemented for %s" % rule.src)
 
-    #print(action, endpoint,protocol)
-
-
+    #Deny all packets from any other external endpoints
+    chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "OUTPUT")
+    rule = iptc.Rule()
+    rule.out_interface = "eth+"
+    rule.src = filename
+    rule.target = iptc.Target(rule, "DROP")
+    chain.insert_rule(rule)
 
 #If developer wants to run script on command line:~$ python config_ip [MUD-like file]
 if __name__ == "__main__":
