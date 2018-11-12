@@ -34,6 +34,22 @@ def implementIPTables(file):
 
     ACLtoIPTable(ACL_array, filename)
 
+def implementIPTablesByJson(file):
+    #obtain desired MUD-like object to parse.
+    #verify and obtain if file content is JSON format
+    try:
+        json_object = json.loads(file)
+
+    except ValueError, e:
+        print("Incorrect File Content Format: JSON")
+        sys.exit()
+
+    #parse mud-like json for ACL
+    ACL_array = json_object["ietf-access-control-list:access-lists"]["acl"]
+
+
+    ACLtoIPTable(ACL_array, filename)
+
 #parse device acl to iptable
 def ACLtoIPTable(acl, filename):
     match, action, endpoint, protocol = '','','',''
@@ -44,7 +60,7 @@ def ACLtoIPTable(acl, filename):
     #implement IPTables for each matches with their respective demands
     for index in ace:
         matches = index["matches"]
-		
+
 	#Confirm that matches has valid info for dest addr
 	if("ietf-acldns:src-dnsname" not in matches["ipv4"]):
 	    continue
@@ -57,7 +73,7 @@ def ACLtoIPTable(acl, filename):
 
 	#resolve dest address
 	dest_addr = socket.gethostbyname(dest_name)
-	
+
 
 	chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "OUTPUT")
 
@@ -68,21 +84,21 @@ def ACLtoIPTable(acl, filename):
 
         rule.dst = dest_addr
         rule.target = iptc.Target(rule, action["forwarding"].upper())
-      
+
         if("tcp" in matches):
             protocol = matches["tcp"]
             rule.protocol = "tcp"
 	    match = iptc.Match(rule, "tcp")
 
-        elif("udp" in matches): 
+        elif("udp" in matches):
 	    protocol = matches["udp"]
             rule.protocol = "udp"
 	    match = iptc.Match(rule, "udp")
 
-        else: 
+        else:
             print("Error in matches")
             pass
-        
+
 
         match.dport = str(protocol["source-port"]["port"])
         rule.add_match(match)
@@ -97,6 +113,9 @@ def ACLtoIPTable(acl, filename):
     rule.src = filename
     rule.target = iptc.Target(rule, "DROP")
     chain.insert_rule(rule)
+
+
+
 
 #If developer wants to run script on command line:~$ python config_ip [MUD-like file]
 if __name__ == "__main__":
