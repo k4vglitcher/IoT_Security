@@ -6,6 +6,7 @@ import json
 #import iptc
 import socket
 import os
+from subprocess import call
 
 def implementIPTables(file):
     #obtain desired MUD-like object to parse.
@@ -62,36 +63,37 @@ def ACLtoIPTable(acl, filename):
         matches = index["matches"]
 
 	#Confirm that matches has valid info for dest addr
-	if("ietf-acldns:src-dnsname" not in matches["ipv4"]):
-	    continue
+	    if("ietf-acldns:src-dnsname" not in matches["ipv4"]):
+	        continue
 
 
         #capture essential info
         action = matches["actions"]
         endpoint = matches["ipv4"]
-	dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
+	    dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
 
-	#resolve dest address
-	dest_addr = socket.gethostbyname(dest_name)
+	    #resolve dest address
+	    dest_addr = socket.gethostbyname(dest_name)
 
-    source = filename
-    destination = dest_addr
+        source = filename
+        destination = dest_addr
 
-    if("tcp" in matches):
-        subport = matches["tcp"]
-        protocol = "tcp"
-    elif("udp" in matches):
-        subport = matches["udp"]
-        protocol = "udp"
-    else:
-        print("Error in Matches")
-        pass
+        if("tcp" in matches):
+            subport = matches["tcp"]
+            protocol = "tcp"
+        elif("udp" in matches):
+            subport = matches["udp"]
+            protocol = "udp"
+        else:
+            print("Error in Matches")
+            pass
 
-    target = action["forwarding"].upper()
-    dport = str(subport["source-port"]["port"])
+        target = action["forwarding"].upper()
+        dport = str(subport["source-port"]["port"])
 
-    call('iptables -o eth+ -p ' + protocol + '-I OUTPUT -s ' + source + ' -d ' + destination + ' -j ' + target + ' --dport ' + dport + '', shell=True)
+        call('iptables -o eth+ -p ' + protocol + ' -I OUTPUT -s ' + source + ' -d ' + destination + ' -j ' + target + ' --dport ' + dport + '', shell=True)
 
+        print("Implemented rule for: source-> " + source + " dest-> " + destination)
     """
 	chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "OUTPUT")
 
