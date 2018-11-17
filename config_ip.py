@@ -3,7 +3,7 @@
 
 import sys
 import json
-import iptc
+#import iptc
 import socket
 import os
 
@@ -24,7 +24,7 @@ def implementIPTables(file):
     try:
         json_object = json.loads(mudfile)
 
-    except ValueError, e:
+    except ValueError:
         print("Incorrect File Content Format: JSON")
         sys.exit()
 
@@ -34,13 +34,13 @@ def implementIPTables(file):
 
     ACLtoIPTable(ACL_array, filename)
 
-def implementIPTablesByJson(file):
+def implementIPTablesByJson(file, filename):
     #obtain desired MUD-like object to parse.
     #verify and obtain if file content is JSON format
     try:
         json_object = json.loads(file)
 
-    except ValueError, e:
+    except ValueError:
         print("Incorrect File Content Format: JSON")
         sys.exit()
 
@@ -52,7 +52,7 @@ def implementIPTablesByJson(file):
 
 #parse device acl to iptable
 def ACLtoIPTable(acl, filename):
-    match, action, endpoint, protocol = '','','',''
+    match, action, endpoint, protocol, subport = '','','','',''
 
     #First set of ACES
     ace = acl[0]["aces"]
@@ -74,7 +74,25 @@ def ACLtoIPTable(acl, filename):
 	#resolve dest address
 	dest_addr = socket.gethostbyname(dest_name)
 
+    source = filename
+    destination = dest_addr
 
+    if("tcp" in matches):
+        subport = matches["tcp"]
+        protocol = "tcp"
+    elif("udp" in matches):
+        subport = matches["udp"]
+        protocol = "udp"
+    else:
+        print("Error in Matches")
+        pass
+
+    target = action["forwarding"].upper()
+    dport = str(subport["source-port"]["port"])
+
+    call('iptables -o eth+ -p ' + protocol + '-I OUTPUT -s ' + source + ' -d ' + destination + ' -j ' + target + ' --dport ' + dport + '', shell=True)
+
+    """
 	chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "OUTPUT")
 
         #for test, just need one
@@ -106,6 +124,7 @@ def ACLtoIPTable(acl, filename):
 
     	print("IPTables Rules implemented for %s" % rule.src)
 
+
     #Deny all packets from any other external endpoints
     chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "OUTPUT")
     rule = iptc.Rule()
@@ -113,7 +132,9 @@ def ACLtoIPTable(acl, filename):
     rule.src = filename
     rule.target = iptc.Target(rule, "DROP")
     chain.insert_rule(rule)
-
+    """
+    target = "DROP"
+    call('iptables -o eth+ -I OUTPUT -s ' + source + ' -j ' + target + '', shell=True)
 
 
 
