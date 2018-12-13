@@ -13,8 +13,10 @@ def update_device_domains(device_dict):
     port = ''
     protocol = ''
     name = device_dict['mac_address']
+    print(name)
     domain = device_dict['domains'][0]['domain']
-    query = "SELECT NAME, DOMAIN, IP, PORT, PROTOCOL from DEVICE WHERE NAME = " + "'{0}'" + " AND DOMAIN = " + "'{1}'".format(name, domain)
+    query = "SELECT NAME, DOMAIN, IP, PORT, PROTOCOL from DEVICE WHERE NAME = " + "'{0}'".format(name) + " AND DOMAIN = " + "'{0}'".format(domain)
+    print(query)
     answer = cursor.execute(query)
 
 
@@ -110,10 +112,11 @@ def update_ipfilter(device_dict, port, protocol):
     source = str(device_dict['ip_address'])
     target = "ACCEPT"
     dport = str(port)
+    domain = device_dict['domains'][0]['domain']
 
     #delete old ips from Database
     name = device_dict['mac_address']
-    old_query = "DELETE FROM DEVICE WHERE NAME = '{0}'".format(name)
+    old_query = "DELETE FROM DEVICE WHERE NAME = '{0}' AND DOMAIN = '{1}'".format(name, domain)
     cursor.execute(old_query)
     conn.commit()
 
