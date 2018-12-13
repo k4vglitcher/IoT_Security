@@ -19,7 +19,33 @@ def update_device_domains(device_dict):
     print(query)
     answer = cursor.execute(query)
 
+    ips = []
+    for rule in answer.fetchall():
+        ips.append(rule[2])
+        port = rule[3]
+        protocol = rule[4]
 
+    print(ips)
+    if ips:
+        for db_ip in device_dict['domains'][0].get('ips'):
+
+            if db_ip in ips:
+                #No change of ip for domain name
+                pass
+            else:
+                #IP has changed for domain name
+                #automatically implement new set of ip
+                valid = True
+
+    if valid:
+        #drop current rules and implement with new ips
+        print("Updating Rules")
+        #do for loop again for each ip and create matches for each to form overall acl, also get tcp or udp and port
+        update_ipfilter(device_dict, port, protocol)
+        valid = False
+
+
+'''
     for rule in answer.fetchall():
         ip = rule[2]
         port = rule[3]
@@ -36,15 +62,7 @@ def update_device_domains(device_dict):
                 #IP has changed for domain name
                 #automatically implement new set of ip
                 valid = True
-
-    if valid:
-        #drop current rules and implement with new ips
-        print("Updating Rules")
-        #do for loop again for each ip and create matches for each to form overall acl, also get tcp or udp and port
-        update_ipfilter(device_dict, port, protocol)
-        valid = False
-
-
+'''
 
 #expand the packet to check for DNS type
 def layer_expand(packet):
