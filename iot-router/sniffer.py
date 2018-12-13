@@ -41,7 +41,7 @@ def update_device_domains(device_dict):
         #drop current rules and implement with new ips
         print("Updating Rules")
         #do for loop again for each ip and create matches for each to form overall acl, also get tcp or udp and port
-        update_ipfilter(device_dict, port, protocol)
+        update_ipfilter(device_dict, port, protocol, ips)
         valid = False
 
 
@@ -125,7 +125,8 @@ def pktHandler(pkt):
         print("Error: filtering for DNS failed")
         pass
 
-def update_ipfilter(device_dict, port, protocol):
+def update_ipfilter(device_dict, port, protocol, ips):
+
     ip_protocol = str(protocol)
     source = str(device_dict['ip_address'])
     target = "ACCEPT"
@@ -138,11 +139,16 @@ def update_ipfilter(device_dict, port, protocol):
     cursor.execute(old_query)
     conn.commit()
 
+    for old_ip in ips:
+        old_dest = old_ip
+        call('iptables -o eth+ -p ' + ip_protocol + ' -D OUTPUT -s ' + source + ' -d ' + old_dest + ' -j ' + target + ' --dport ' + dport + '', shell=True)
+
+
     for db_ip in device_dict['domains'][0].get('ips'):
         destination = str(db_ip)
         print("Source: {0} destination: {1} protocol: {2} port: {3}".format(source, destination, ip_protocol, dport))
 
-        #call('iptables -o eth+ -p ' + ip_protocol + ' -I OUTPUT -s ' + source + ' -d ' + destination + ' -j ' + target + ' --dport ' + dport + '', shell=True)
+        call('iptables -o eth+ -p ' + ip_protocol + ' -I OUTPUT -s ' + source + ' -d ' + destination + ' -j ' + target + ' --dport ' + dport + '', shell=True)
 
         #update database with new ip
         query = "INSERT INTO DEVICE(NAME, DOMAIN, IP, PORT, PROTOCOL) VALUES('{0}','{1}','{2}','{3}','{4}')".format(name, str(device_dict['domains'][0]['domain']), destination, dport, ip_protocol)
