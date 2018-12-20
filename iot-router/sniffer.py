@@ -12,8 +12,8 @@ def update_device_domains(device_dict):
     valid = False
     port = ''
     protocol = ''
-    name = device_dict['mac_address']
-    print(name)
+    #name = device_dict['mac_address']
+    name = 'iphone'
     domain = device_dict['domains'][0]['domain']
     query = "SELECT NAME, DOMAIN, IP, PORT, PROTOCOL from DEVICE WHERE NAME = " + "'{0}'".format(name) + " AND DOMAIN = " + "'{0}'".format(domain)
     print(query)
@@ -140,21 +140,22 @@ def update_ipfilter(device_dict, port, protocol, ips):
     domain = device_dict['domains'][0]['domain']
 
     #delete old ips from Database
-    name = device_dict['mac_address']
+    #name = device_dict['mac_address']
+    name = 'iphone'
     old_query = "DELETE FROM DEVICE WHERE NAME = '{0}' AND DOMAIN = '{1}'".format(name, domain)
     cursor.execute(old_query)
     conn.commit()
 
     for old_ip in ips:
         old_dest = old_ip
-        call('iptables -o eth+ -p ' + ip_protocol + ' -D OUTPUT -s ' + source + ' -d ' + old_dest + ' -j ' + target + ' --dport ' + dport + '', shell=True)
+        call('iptables -o eth+ -D OUTPUT -p ' + ip_protocol + ' -s ' + source + ' -d ' + old_dest + ' --dport ' + dport + ' -j ' + target + '', shell=True)
 
 
     for db_ip in device_dict['domains'][0].get('ips'):
         destination = str(db_ip)
         print("Source: {0} destination: {1} protocol: {2} port: {3}".format(source, destination, ip_protocol, dport))
 
-        call('iptables -o eth+ -p ' + ip_protocol + ' -I OUTPUT -s ' + source + ' -d ' + destination + ' -j ' + target + ' --dport ' + dport + '', shell=True)
+        call('iptables -o eth+ -I OUTPUT -p ' + ip_protocol + ' -s ' + source + ' -d ' + destination + ' --dport ' + dport + ' -j ' + target + '', shell=True)
 
         #update database with new ip
         query = "INSERT INTO DEVICE(NAME, DOMAIN, IP, PORT, PROTOCOL) VALUES('{0}','{1}','{2}','{3}','{4}')".format(name, str(device_dict['domains'][0]['domain']), destination, dport, ip_protocol)
