@@ -112,9 +112,15 @@ def dns_callback(pkt):
 def standard_dns_callback(pkt):
     layers = list(layer_expand(pkt))
 
+    # if "DNS" in layers:
+    #     dns_callback(pkt)
+    # else:
+    #     pass
     if "DNS" in layers:
         dns_callback(pkt)
-    else:
+    elif "DHCP" in layers:
+        print("Do something")
+    else
         pass
 
 

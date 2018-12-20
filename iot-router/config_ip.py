@@ -7,6 +7,7 @@ import json
 import socket
 import os
 from subprocess import call
+import sqlite3
 
 def implementIPTables(file):
     #obtain desired MUD-like object to parse.
@@ -55,6 +56,23 @@ def implementIPTablesByJson(file, filename):
 def ACLtoIPTable(acl, filename):
     match, action, endpoint, protocol, subport = '','','','',''
 
+    #configure database and connect
+    #check if device database exist
+    exists = os.path.exists('device.db')
+
+    if exists:
+        conn = sqlite3.connect('device.db')
+        print("Database is running")
+
+    else:
+        #create db and insert main schema
+        conn = sqlite3.connect('device.db')
+        print("Database has been created")
+        conn.execute('CREATE TABLE DEVICE (NAME CHAR(20) NOT NULL, DOMAIN CHAR(50) NOT NULL, IP CHAR(20) NOT NULL, PORT CHAR(20) NOT NULL, PROTOCOL CHAR(20) NOT NULL);')
+        print("Main device table created")
+
+    cursor = conn.cursor()
+
     #First set of ACES
     ace = acl[0]["aces"]
 
@@ -62,18 +80,18 @@ def ACLtoIPTable(acl, filename):
     for index in ace:
         matches = index["matches"]
 
-	#Confirm that matches has valid info for dest addr
-	    if("ietf-acldns:src-dnsname" not in matches["ipv4"]):
-	        continue
+	    #Confirm that matches has valid info for dest addr
+        if("ietf-acldns:src-dnsname" not in matches["ipv4"]):
+            continue
 
 
         #capture essential info
         action = matches["actions"]
         endpoint = matches["ipv4"]
-	    dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
+        dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
 
 	    #resolve dest address
-	    dest_addr = socket.gethostbyname(dest_name)
+        dest_addr = socket.gethostbyname(dest_name)
 
         source = filename
         destination = dest_addr
@@ -94,6 +112,16 @@ def ACLtoIPTable(acl, filename):
         call('iptables -o eth+ -p ' + protocol + ' -I OUTPUT -s ' + source + ' -d ' + destination + ' -j ' + target + ' --dport ' + dport + '', shell=True)
 
         print("Implemented rule for: source-> " + source + " dest-> " + destination)
+
+        #Add to database to track
+        name = 'mac'
+        query = "INSERT INTO DEVICE(NAME, DOMAIN, IP, PORT, PROTOCOL) VALUES('{0}','{1}','{2}','{3}','{4}')".format(name, dest_name, destination, dport, protocol)
+        #^need to sniff for new joining devices by their dhcp and get their mac address/ip_address. @params: name, dest_name (filename)
+
+        print(query)
+        cursor.execute(query)
+        conn.commit()
+
     """
 	chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "OUTPUT")
 
