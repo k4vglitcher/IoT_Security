@@ -13,7 +13,7 @@ def update_device_domains(device_dict):
     port = ''
     protocol = ''
     #name = device_dict['mac_address']
-    name = 'iphone'
+    name = 'mac'
     domain = device_dict['domains'][0]['domain']
     query = "SELECT NAME, DOMAIN, IP, PORT, PROTOCOL from DEVICE WHERE NAME = " + "'{0}'".format(name) + " AND DOMAIN = " + "'{0}'".format(domain)
     print(query)
@@ -120,7 +120,7 @@ def standard_dns_callback(pkt):
         dns_callback(pkt)
     elif "DHCP" in layers:
         print("Do something")
-    else
+    else:
         pass
 
 
@@ -141,7 +141,7 @@ def update_ipfilter(device_dict, port, protocol, ips):
 
     #delete old ips from Database
     #name = device_dict['mac_address']
-    name = 'iphone'
+    name = 'mac'
     old_query = "DELETE FROM DEVICE WHERE NAME = '{0}' AND DOMAIN = '{1}'".format(name, domain)
     cursor.execute(old_query)
     conn.commit()
@@ -149,7 +149,7 @@ def update_ipfilter(device_dict, port, protocol, ips):
     for old_ip in ips:
         old_dest = old_ip
         call('iptables -o eth+ -D OUTPUT -p ' + ip_protocol + ' -s ' + source + ' -d ' + old_dest + ' --dport ' + dport + ' -j ' + target + '', shell=True)
-
+        print('iptables -o eth+ -D OUTPUT -p ' + ip_protocol + ' -s ' + source + ' -d ' + old_dest + ' --dport ' + dport + ' -j ' + target + '')
 
     for db_ip in device_dict['domains'][0].get('ips'):
         destination = str(db_ip)
