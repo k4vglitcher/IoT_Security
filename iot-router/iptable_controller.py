@@ -9,7 +9,11 @@ import urllib2
 from config_ip import implementIPTablesByJson
 import ssl
 
-def obtainMudProfile(device, ip):
+def obtainMudProfile(device, mac_addr):
+
+  if(device == 'iot_device'):
+  	print("SUCCESS")
+	print("log: {0} {1}".format(device, mac_addr))
 
   if(device):
     #send request to API for device's MUD Profile
@@ -20,7 +24,8 @@ def obtainMudProfile(device, ip):
 
     profile = result.read().decode('utf-8')
 
-    implementIPTablesByJson(profile, ip)
+    print(profile)
+    implementIPTablesByJson(profile, mac_addr)
 
   else:
     print('name of device is missing')

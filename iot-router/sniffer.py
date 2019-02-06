@@ -6,6 +6,7 @@ from scapy.all import *
 import sqlite3
 import os
 from subprocess import call
+from iptable_controller import obtainMudProfile
 
 #update database when new ACL is detected
 def update_device_domains(device_dict):
@@ -13,8 +14,8 @@ def update_device_domains(device_dict):
     port = ''
     protocol = ''
     #name = device_dict['mac_address']
-    name = 'mac'
-    domain = device_dict['domains'][0]['domain']
+    name = 'd0:25:98:ee:22:7f'
+    domain = device_dict['domains'][0]['domain'][:-1]
     query = "SELECT NAME, DOMAIN, IP, PORT, PROTOCOL from DEVICE WHERE NAME = " + "'{0}'".format(name) + " AND DOMAIN = " + "'{0}'".format(domain)
     print(query)
     answer = cursor.execute(query)
@@ -25,7 +26,7 @@ def update_device_domains(device_dict):
         port = rule[3]
         protocol = rule[4]
 
-    print(ips)
+    #print(ips)
     if ips:
         for db_ip in device_dict['domains'][0].get('ips'):
 
@@ -53,8 +54,8 @@ def update_device_domains(device_dict):
 
         for db_ip in device_dict['domains'][0].get('ips'):
 
-            print("OLD IP: {0}".format(ip))
-            print("NEW IP: {0}".format(db_ip))
+            #print("OLD IP: {0}".format(ip))
+            #print("NEW IP: {0}".format(db_ip))
             if db_ip == ip:
                 #No change of ip for domain name
                 pass
@@ -76,7 +77,7 @@ def dns_callback(pkt):
 
     if DNS in pkt and 'Ans' in pkt.summary():
         response = []
-        print(pkt.haslayer(TCP))
+        #print(pkt.haslayer(TCP))
 
         for x in xrange(pkt[DNS].ancount):
             #capture the data in res packet
@@ -100,7 +101,7 @@ def dns_callback(pkt):
             device_dict['domains'] = domains
 
             update_device_domains(device_dict)
-            print("ITS OVER")
+            #print("ITS OVER")
 
 
 
@@ -118,8 +119,18 @@ def standard_dns_callback(pkt):
     #     pass
     if "DNS" in layers:
         dns_callback(pkt)
-    elif "DHCP" in layers:
-        print("Do something")
+
+    elif "BOOTP" in layers:
+	print(pkt[Ether].src)
+	mac_addr = str(pkt[Ether].src)
+
+	if mac_addr not in devices:
+	    devices.add(mac_addr)
+	    obtainMudProfile('iot_device', mac_addr)
+	
+	else:
+	    pass
+
     else:
         pass
 
@@ -128,7 +139,7 @@ def pktHandler(pkt):
     try:
         standard_dns_callback(pkt)
     except Exception as e:
-        print("Error: filtering for DNS failed")
+        #print("Error: filtering for DNS failed")
         pass
 
 def update_ipfilter(device_dict, port, protocol, ips):
@@ -137,29 +148,35 @@ def update_ipfilter(device_dict, port, protocol, ips):
     source = str(device_dict['ip_address'])
     target = "ACCEPT"
     dport = str(port)
-    domain = device_dict['domains'][0]['domain']
+    domain = device_dict['domains'][0]['domain'][:-1]
 
     #delete old ips from Database
-    #name = device_dict['mac_address']
-    name = 'mac'
-    old_query = "DELETE FROM DEVICE WHERE NAME = '{0}' AND DOMAIN = '{1}'".format(name, domain)
+    #mac_source = device_dict['mac_address']
+    mac_source = 'd0:25:98:ee:22:7f'
+
+    old_query = "DELETE FROM DEVICE WHERE NAME = '{0}' AND DOMAIN = '{1}'".format(mac_source, domain)
     cursor.execute(old_query)
     conn.commit()
 
     for old_ip in ips:
         old_dest = old_ip
-        call('iptables -o eth+ -D OUTPUT -p ' + ip_protocol + ' -s ' + source + ' -d ' + old_dest + ' --dport ' + dport + ' -j ' + target + '', shell=True)
-        print('iptables -o eth+ -D OUTPUT -p ' + ip_protocol + ' -s ' + source + ' -d ' + old_dest + ' --dport ' + dport + ' -j ' + target + '')
+        #call('iptables -A INPUT -p ' + ip_protocol + ' -m mac --mac-source ' + mac_source + ' -d ' + old_dest + ' --dport ' + dport + ' -j ' + target + '', shell=True)
+        call('iptables -D INPUT -p ' + ip_protocol + ' -d '+ old_dest + ' --dport ' + dport + ' -m mac --mac-source ' + mac_source + ' -j ' + target + '', shell=True)
+ 
+       
+       
+       #print('iptables -o eth+ -D OUTPUT -p ' + ip_protocol + ' -m mac --mac-source ' + mac_source + ' -d ' + old_dest + ' --dport ' + dport + ' -j ' + target + '')
+
+
 
     for db_ip in device_dict['domains'][0].get('ips'):
         destination = str(db_ip)
-        print("Source: {0} destination: {1} protocol: {2} port: {3}".format(source, destination, ip_protocol, dport))
+        print("Source: {0} destination: {1} protocol: {2} port: {3}".format(mac_source, destination, ip_protocol, dport))
 
-        call('iptables -o eth+ -I OUTPUT -p ' + ip_protocol + ' -s ' + source + ' -d ' + destination + ' --dport ' + dport + ' -j ' + target + '', shell=True)
-
+        call('iptables -A INPUT -p ' + ip_protocol + ' -d '+ destination + ' --dport ' + dport + ' -m mac --mac-source ' + mac_source + ' -j ' + target + '', shell=True)
         #update database with new ip
-        query = "INSERT INTO DEVICE(NAME, DOMAIN, IP, PORT, PROTOCOL) VALUES('{0}','{1}','{2}','{3}','{4}')".format(name, str(device_dict['domains'][0]['domain']), destination, dport, ip_protocol)
-        print(query)
+        query = "INSERT INTO DEVICE(NAME, DOMAIN, IP, PORT, PROTOCOL) VALUES('{0}','{1}','{2}','{3}','{4}')".format(mac_source, str(device_dict['domains'][0]['domain']), destination, dport, ip_protocol)
+    
         cursor.execute(query)
         conn.commit()
 
@@ -167,6 +184,8 @@ def update_ipfilter(device_dict, port, protocol, ips):
 
 #check if device database exist
 exists = os.path.exists('device.db')
+devices = set()
+devices.add("10:da:43:96:1d:64")
 
 if exists:
     conn = sqlite3.connect('device.db')
@@ -182,5 +201,5 @@ else:
 
 cursor = conn.cursor()
 
-#capture all packets, can use filter for dns
+#capture all packets
 sniff(prn=pktHandler)

@@ -36,7 +36,7 @@ def implementIPTables(file):
 
     ACLtoIPTable(ACL_array, filename)
 
-def implementIPTablesByJson(file, filename):
+def implementIPTablesByJson(file, mac_addr):
     #obtain desired MUD-like object to parse.
     #verify and obtain if file content is JSON format
     try:
@@ -46,14 +46,15 @@ def implementIPTablesByJson(file, filename):
         print("Incorrect File Content Format: JSON")
         sys.exit()
 
+    print("Parsing ACL from Mud Profile")
     #parse mud-like json for ACL
     ACL_array = json_object["ietf-access-control-list:access-lists"]["acl"]
 
 
-    ACLtoIPTable(ACL_array, filename)
+    ACLtoIPTable(ACL_array, mac_addr)
 
 #parse device acl to iptable
-def ACLtoIPTable(acl, filename):
+def ACLtoIPTable(acl, mac_addr):
     match, action, endpoint, protocol, subport = '','','','',''
 
     #configure database and connect
@@ -75,26 +76,36 @@ def ACLtoIPTable(acl, filename):
 
     #First set of ACES
     ace = acl[0]["aces"]
+    
+    print("Implementing iptables rules")
 
     #implement IPTables for each matches with their respective demands
     for index in ace:
         matches = index["matches"]
 
-	    #Confirm that matches has valid info for dest addr
-        if("ietf-acldns:src-dnsname" not in matches["ipv4"]):
+	
+	#Confirm that matches has valid info for dest addr
+        if("ietf-acldns:src-dnsname" not in matches["ipv4"] and "ietf-acldns:dst-dnsname" not in matches["ipv4"]):
             continue
 
 
         #capture essential info
         action = matches["actions"]
         endpoint = matches["ipv4"]
-        dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
+        if "ietf-acldns:src-dnsname" in matches["ipv4"]:
+	    dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
+	elif "ietf-acldns:dst-dnsname" in matches["ipv4"]:
+	    dest_name = endpoint["ietf-acldns:dst-dnsname"][:-1]
+	else:
+	    continue
 
-	    #resolve dest address
+	
+	#resolve dest address
         dest_addr = socket.gethostbyname(dest_name)
 
-        source = filename
+        mac_source = mac_addr
         destination = dest_addr
+	
 
         if("tcp" in matches):
             subport = matches["tcp"]
@@ -106,17 +117,26 @@ def ACLtoIPTable(acl, filename):
             print("Error in Matches")
             pass
 
+	
         target = action["forwarding"].upper()
-        dport = str(subport["source-port"]["port"])
 
-        call('iptables -o eth+ -p ' + protocol + ' -I OUTPUT -s ' + source + ' -d ' + destination + ' -j ' + target + ' --dport ' + dport + '', shell=True)
+        if "ietf-acldns:src-dnsname" in matches["ipv4"]:
+	    dport = str(subport["source-port"]["port"])
+	elif "ietf-acldns:dst-dnsname" in matches["ipv4"]:
+            dport = str(subport["destination-port"]["port"])
+	else:
+	    continue
 
-        print("Implemented rule for: source-> " + source + " dest-> " + destination)
+
+	
+        call('iptables -A INPUT -p ' + protocol + ' -d ' + destination + ' --dport ' + dport + ' -m mac --mac-source ' + mac_source + ' -j ' + target + '', shell=True)
+	
+        print("Implemented rule for: source-> " + mac_source + " dest-> " + destination)
 
         #Add to database to track
-        name = 'mac'
+        name = mac_source
         query = "INSERT INTO DEVICE(NAME, DOMAIN, IP, PORT, PROTOCOL) VALUES('{0}','{1}','{2}','{3}','{4}')".format(name, dest_name, destination, dport, protocol)
-        #^need to sniff for new joining devices by their dhcp and get their mac address/ip_address. @params: name, dest_name (filename)
+        
 
         print(query)
         cursor.execute(query)
@@ -164,7 +184,7 @@ def ACLtoIPTable(acl, filename):
     chain.insert_rule(rule)
     """
     target = "DROP"
-    call('iptables -o eth+ -I OUTPUT -s ' + source + ' -j ' + target + '', shell=True)
+    call('iptables -A INPUT -m mac --mac-source ' + mac_source + ' -j ' + target + '', shell=True)
 
 
 
