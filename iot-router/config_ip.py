@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 #python iptable configuration
+#Implement iptables rules from MUD Profile for specific IoT Device
 
 import sys
 import json
@@ -9,6 +10,7 @@ import os
 from subprocess import call
 import sqlite3
 
+#Manually inserting MUD Profile
 def implementIPTables(file):
     #obtain desired MUD-like object to parse.
     try:
@@ -36,6 +38,7 @@ def implementIPTables(file):
 
     ACLtoIPTable(ACL_array, filename)
 
+#Obtained MUD Profile from MUD Profile Server
 def implementIPTablesByJson(file, mac_addr):
     #obtain desired MUD-like object to parse.
     #verify and obtain if file content is JSON format
@@ -76,14 +79,14 @@ def ACLtoIPTable(acl, mac_addr):
 
     #First set of ACES
     ace = acl[0]["aces"]
-    
+
     print("Implementing iptables rules")
 
     #implement IPTables for each matches with their respective demands
     for index in ace:
         matches = index["matches"]
 
-	
+
 	#Confirm that matches has valid info for dest addr
         if("ietf-acldns:src-dnsname" not in matches["ipv4"] and "ietf-acldns:dst-dnsname" not in matches["ipv4"]):
             continue
@@ -93,19 +96,19 @@ def ACLtoIPTable(acl, mac_addr):
         action = matches["actions"]
         endpoint = matches["ipv4"]
         if "ietf-acldns:src-dnsname" in matches["ipv4"]:
-	    dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
-	elif "ietf-acldns:dst-dnsname" in matches["ipv4"]:
-	    dest_name = endpoint["ietf-acldns:dst-dnsname"][:-1]
-	else:
-	    continue
+            dest_name = endpoint["ietf-acldns:src-dnsname"][:-1]
+        elif "ietf-acldns:dst-dnsname" in matches["ipv4"]:
+            dest_name = endpoint["ietf-acldns:dst-dnsname"][:-1]
+        else:
+            continue
 
-	
-	#resolve dest address
+
+	    #resolve dest address
         dest_addr = socket.gethostbyname(dest_name)
 
         mac_source = mac_addr
         destination = dest_addr
-	
+
 
         if("tcp" in matches):
             subport = matches["tcp"]
@@ -117,31 +120,33 @@ def ACLtoIPTable(acl, mac_addr):
             print("Error in Matches")
             pass
 
-	
+
         target = action["forwarding"].upper()
 
         if "ietf-acldns:src-dnsname" in matches["ipv4"]:
-	    dport = str(subport["source-port"]["port"])
-	elif "ietf-acldns:dst-dnsname" in matches["ipv4"]:
+	        dport = str(subport["source-port"]["port"])
+        elif "ietf-acldns:dst-dnsname" in matches["ipv4"]:
             dport = str(subport["destination-port"]["port"])
-	else:
-	    continue
+        else:
+            continue
 
 
-	
+        #Append iptables rule to INPUT chain
         call('iptables -A INPUT -p ' + protocol + ' -d ' + destination + ' --dport ' + dport + ' -m mac --mac-source ' + mac_source + ' -j ' + target + '', shell=True)
-	
+
         print("Implemented rule for: source-> " + mac_source + " dest-> " + destination)
 
         #Add to database to track
         name = mac_source
         query = "INSERT INTO DEVICE(NAME, DOMAIN, IP, PORT, PROTOCOL) VALUES('{0}','{1}','{2}','{3}','{4}')".format(name, dest_name, destination, dport, protocol)
-        
+
 
         print(query)
         cursor.execute(query)
         conn.commit()
 
+
+#Below is iptables implementation using python-iptables
     """
 	chain = iptc.Chain(iptc.Table(iptc.Table.FILTER), "OUTPUT")
 
@@ -183,6 +188,7 @@ def ACLtoIPTable(acl, mac_addr):
     rule.target = iptc.Target(rule, "DROP")
     chain.insert_rule(rule)
     """
+    #Append DROP iptables rule to INPUT chain
     target = "DROP"
     call('iptables -A INPUT -m mac --mac-source ' + mac_source + ' -j ' + target + '', shell=True)
 

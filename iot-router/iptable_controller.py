@@ -9,6 +9,7 @@ import urllib2
 from config_ip import implementIPTablesByJson
 import ssl
 
+#Obtain MUD Profile from server based on Device Type
 def obtainMudProfile(device, mac_addr):
 
   if(device == 'iot_device'):
@@ -19,12 +20,13 @@ def obtainMudProfile(device, mac_addr):
     #send request to API for device's MUD Profile
     req = urllib2.Request('https://morning-brook-63432.herokuapp.com/api/products/MUDProfile/?device=' + device)
     gcontext = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-    #call config_ip.py function to implement MUD profile
+
     result = urllib2.urlopen(req, context = gcontext)
 
     profile = result.read().decode('utf-8')
 
     print(profile)
+    #call config_ip.py's function to implement MUD profile
     implementIPTablesByJson(profile, mac_addr)
 
   else:
